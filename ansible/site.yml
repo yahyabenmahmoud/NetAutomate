@@ -1,0 +1,6 @@
+---
+- name: Provisionner la VM avec Docker
+  hosts: all
+  become: true
+  roles:
+    - docker
