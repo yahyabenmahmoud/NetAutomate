@@ -37,7 +37,7 @@ def test_subnet_ok():
     # Request details for a valid /24 subnet.
     response = client.get("/api/subnet", params={"cidr": "192.168.1.0/24"})
     # Confirm success and verify the expected usable host count.
-    assert response.status_code == 200 and response.json()["usable_hosts"] == 255
+    assert response.status_code == 200 and response.json()["usable_hosts"] == 254
 
 
 # Verify that an invalid subnet query is rejected.
