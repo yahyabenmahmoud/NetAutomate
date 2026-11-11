@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NetAutomate</title>
+<style>
+:root{--bg:#eef2f4;--panel:#fff;--ink:#12212b;--mute:#566673;--line:#d5dde2;--net:#0b6e8a;--host:#dfe7ec;--ok:#1b7a4b;--bad:#b3362a;--warn:#9a6200;color-scheme:light}
+@media (prefers-color-scheme:dark){:root{--bg:#0e171d;--panel:#14212a;--ink:#e4ecf1;--mute:#8fa1ad;--line:#25353f;--net:#4fb3d1;--host:#1f313b;--ok:#4cc38a;--bad:#ff7a6b;--warn:#e0a23a;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.mono{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 24px;background:var(--panel);border-bottom:1px solid var(--line)}
+h1{margin:0;font-size:1.15rem;font-weight:700;letter-spacing:.2px}
+header p{margin:0;color:var(--mute);font-size:.85rem}
+.status{display:inline-flex;align-items:center;gap:8px;font-size:.85rem;color:var(--mute)}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--mute)}
+.status.up .dot{background:var(--ok)}.status.down .dot{background:var(--bad)}
+.shell{display:grid;grid-template-columns:210px 1fr;gap:20px;max-width:1080px;margin:22px auto;padding:0 16px}
+nav{display:flex;flex-direction:column;gap:2px;align-self:start}
+nav button{all:unset;cursor:pointer;padding:9px 12px;border-left:3px solid transparent;color:var(--mute);border-radius:0 6px 6px 0}
+nav button:hover{color:var(--ink);background:var(--panel)}
+nav button[aria-selected=true]{color:var(--ink);font-weight:600;border-left-color:var(--net);background:var(--panel)}
+nav button:focus-visible,button.go:focus-visible,input:focus-visible{outline:2px solid var(--net);outline-offset:2px}
+main{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:24px;min-height:380px}
+section[hidden]{display:none}
+h2{margin:0 0 4px;font-size:1.3rem}
+.lead{margin:0 0 18px;color:var(--mute);max-width:62ch}
+form{display:flex;flex-wrap:wrap;gap:10px;align-items:end;margin-bottom:18px}
+label{display:flex;flex-direction:column;gap:4px;font-size:.85rem;color:var(--mute)}
+input{font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);min-width:230px}
+input.small{min-width:90px;width:100px}
+button.go{font:inherit;font-weight:600;padding:9px 16px;border:0;border-radius:6px;background:var(--net);color:#fff;cursor:pointer}
+@media (prefers-color-scheme:dark){button.go{color:#08141a}}
+button.go:disabled{opacity:.6;cursor:wait}
+.bits{display:flex;flex-wrap:wrap;gap:10px;margin:6px 0 18px}
+.oct{display:flex;gap:2px}
+.bit{width:15px;height:26px;border-radius:3px;background:var(--host);color:var(--mute);font-size:.7rem;display:grid;place-items:center}
+.bit.n{background:var(--net);color:#fff}
+@media (prefers-color-scheme:dark){.bit.n{color:#08141a}}
+.legend{font-size:.8rem;color:var(--mute);margin:-10px 0 16px}
+dl{display:grid;grid-template-columns:max-content 1fr;gap:6px 22px;margin:0}
+dt{color:var(--mute)}dd{margin:0;overflow-wrap:anywhere}
+table{width:100%;border-collapse:collapse;font-size:.9rem}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--mute);font-weight:600}
+.wrap{overflow-x:auto}
+.tag{padding:1px 8px;border-radius:10px;font-size:.78rem;border:1px solid currentColor}
+.tag.ok{color:var(--ok)}.tag.bad{color:var(--bad)}.tag.warn{color:var(--warn)}
+.msg{padding:10px 12px;border-radius:6px;border:1px solid var(--line)}
+.msg.err{border-color:var(--bad);color:var(--bad)}
+.msg.ok{border-color:var(--ok)}
+@media (max-width:760px){.shell{grid-template-columns:1fr}nav{flex-direction:row;overflow-x:auto}nav button{border-left:0;border-bottom:3px solid transparent;border-radius:6px 6px 0 0;white-space:nowrap}nav button[aria-selected=true]{border-bottom-color:var(--net)}header{padding:12px 16px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <div><h1>NetAutomate</h1><p>Console de diagnostic réseau</p></div>
+  <span id="status" class="status"><span class="dot"></span><span id="statusText">Vérification de l'API…</span></span>
+</header>
+<div class="shell">
+  <nav role="tablist" aria-label="Outils">
+    <button role="tab" data-t="subnet" aria-selected="true">Sous-réseau</button>
+    <button role="tab" data-t="dns" aria-selected="false">Résolution DNS</button>
+    <button role="tab" data-t="conn" aria-selected="false">Connectivité TCP</button>
+    <button role="tab" data-t="ifaces" aria-selected="false">Interfaces</button>
+    <button role="tab" data-t="config" aria-selected="false">Configuration</button>
+    <button role="tab" data-t="devices" aria-selected="false">Équipements</button>
+  </nav>
+  <main>
+    <section id="subnet">
+      <h2>Calculateur de sous-réseau IPv4</h2>
+      <p class="lead">Saisissez un réseau en notation CIDR. Les bits du préfixe réseau sont colorés, les bits hôtes restent clairs.</p>
+      <form data-f="subnet"><label>Réseau (CIDR)<input name="cidr" value="192.168.1.0/24" class="mono" required></label><button class="go">Calculer</button></form>
+      <div class="out"></div>
+    </section>
+    <section id="dns" hidden>
+      <h2>Résolution DNS</h2>
+      <p class="lead">Trouve les adresses IP d'un nom. Seules les cibles autorisées par l'administrateur sont acceptées.</p>
+      <form data-f="dns"><label>Nom d'hôte<input name="hostname" value="example.com" required></label><button class="go">Résoudre</button></form>
+      <div class="out"></div>
+    </section>
+    <section id="conn" hidden>
+      <h2>Connectivité TCP</h2>
+      <p class="lead">Teste si un service répond sur un port et mesure le délai de connexion.</p>
+      <form data-f="conn"><label>Hôte<input name="host" value="example.com" required></label><label>Port<input name="port" type="number" min="1" max="65535" value="443" class="small" required></label><button class="go">Tester</button></form>
+      <div class="out"></div>
+    </section>
+    <section id="ifaces" hidden><h2>Interfaces réseau</h2><p class="lead">Interfaces de la machine qui exécute l'API.</p><div class="out"></div></section>
+    <section id="config" hidden><h2>Configuration réseau</h2><p class="lead">Nom d'hôte, passerelle par défaut et serveurs DNS.</p><div class="out"></div></section>
+    <section id="devices" hidden><h2>Inventaire des équipements</h2><p class="lead">Équipements réseau déclarés.</p><div class="out"></div></section>
+  </main>
+</div>
+<script>
+const $=(s,r=document)=>r.querySelector(s);
+const el=(t,txt,cls)=>{const e=document.createElement(t);if(txt!==undefined)e.textContent=txt;if(cls)e.className=cls;return e};
+
+async function api(path,params){
+  const r=await fetch(path+(params?'?'+new URLSearchParams(params):''));
+  let d=null;try{d=await r.json()}catch(e){}
+  if(!r.ok){
+    const m=d&&typeof d.detail==='string'?d.detail:(r.status===422?'Valeur invalide, vérifiez la saisie.':'Erreur '+r.status);
+    throw new Error(m);
+  }
+  return d;
+}
+function note(box,text,kind){box.replaceChildren(el('div',text,'msg '+(kind||'')))}
+function kv(rows){const dl=el('dl');rows.forEach(([k,v])=>{dl.append(el('dt',k),el('dd',v==null||v===''?'-':String(v)))});return dl}
+function tag(text,kind){return el('span',text,'tag '+kind)}
+function table(cols,rows){
+  const w=el('div',undefined,'wrap'),t=el('table'),h=el('tr');
+  cols.forEach(c=>h.append(el('th',c)));t.append(h);
+  rows.forEach(r=>{const tr=el('tr');r.forEach(c=>{const td=el('td');td.append(c instanceof Node?c:document.createTextNode(c==null?'-':c));tr.append(td)});t.append(tr)});
+  w.append(t);return w;
+}
+async function run(box,btn,fn){
+  if(btn)btn.disabled=true;note(box,'Chargement…');
+  try{box.replaceChildren(await fn())}catch(e){note(box,e.message,'err')}
+  finally{if(btn)btn.disabled=false}
+}
+
+const tools={
+  subnet:async f=>{
+    const s=await api('/api/subnet',{cidr:f.cidr.value.trim()});
+    const o=s.network_address.split('.').map(Number),bar=el('div',undefined,'bits');
+    o.forEach((v,i)=>{const g=el('div',undefined,'oct');
+      v.toString(2).padStart(8,'0').split('').forEach((b,j)=>g.append(el('span',b,'bit mono'+(i*8+j<s.prefix_length?' n':''))));bar.append(g)});
+    const wrap=el('div');
+    wrap.append(bar,el('p','Bits réseau : '+s.prefix_length+'  |  bits hôtes : '+(32-s.prefix_length),'legend'),
+      kv([['Réseau',s.network_address+'/'+s.prefix_length],['Masque',s.netmask],['Wildcard',s.wildcard],['Broadcast',s.broadcast_address],
+          ['Première adresse hôte',s.first_host],['Dernière adresse hôte',s.last_host],['Adresses au total',s.total_addresses],['Hôtes utilisables',s.usable_hosts]]));
+    return wrap;
+  },
+  dns:async f=>{
+    const d=await api('/api/diagnostics/dns',{hostname:f.hostname.value.trim()});
+    return table(['Nom','Adresse IP'],d.addresses.map(a=>[d.hostname,a]));
+  },
+  conn:async f=>{
+    const c=await api('/api/diagnostics/connectivity',{host:f.host.value.trim(),port:f.port.value});
+    return kv([['Cible',c.host+':'+c.port],['État',c.reachable?'Joignable':'Injoignable'],['Délai',c.latency_ms!=null?c.latency_ms+' ms':'-'],['Détail',c.error]]);
+  },
+  ifaces:async()=>{
+    const l=await api('/api/interfaces');
+    return table(['Interface','État','IPv4','MAC','MTU','Débit (Mb/s)'],
+      l.map(i=>[i.name,tag(i.is_up?'actif':'inactif',i.is_up?'ok':'warn'),i.ipv4.join(', ')||'-',i.mac,i.mtu,i.speed_mbps]));
+  },
+  config:async()=>{
+    const c=await api('/api/network/config');
+    return kv([['Nom d\'hôte',c.hostname],['Nom complet (FQDN)',c.fqdn],['Passerelle par défaut',c.default_gateway],['Serveurs DNS',c.dns_servers.join(', ')]]);
+  },
+  devices:async()=>{
+    const l=await api('/api/devices');
+    return table(['Nom','Type','Adresse IP','Emplacement','État'],
+      l.map(d=>[d.name,d.type,d.ip,d.location,tag(d.status==='active'?'actif':d.status,d.status==='active'?'ok':'warn')]));
+  }
+};
+
+function show(t){
+  document.querySelectorAll('nav button').forEach(b=>b.setAttribute('aria-selected',b.dataset.t===t));
+  document.querySelectorAll('main section').forEach(s=>s.hidden=s.id!==t);
+  const sec=$('#'+t);
+  if(!sec.querySelector('form')&&tools[t])run($('.out',sec),null,()=>tools[t]());
+  else if(t==='subnet'&&!sec.dataset.done){sec.dataset.done=1;$('form',sec).requestSubmit()}
+}
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>show(b.dataset.t));
+document.querySelectorAll('form').forEach(f=>f.onsubmit=e=>{
+  e.preventDefault();run($('.out',f.parentElement),$('button',f),()=>tools[f.dataset.f](f));
+});
+fetch('/health').then(r=>r.json()).then(()=>{$('#status').className='status up';$('#statusText').textContent='API disponible'})
+  .catch(()=>{$('#status').className='status down';$('#statusText').textContent='API injoignable'});
+show('subnet');
+</script>
+</body>
+</html>
