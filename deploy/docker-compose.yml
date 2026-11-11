@@ -1,0 +1,16 @@
+services:
+  network-api:
+    image: ${DOCKERHUB_USER}/network-devops:${IMAGE_TAG:-latest}
+    container_name: network-api
+    ports:
+      - "8000:8000"
+    environment:
+      APP_ENV: production
+      ALLOWED_TARGETS: ${ALLOWED_TARGETS:-localhost,127.0.0.1,example.com,192.168.56.0/24}
+    networks:
+      - netdevops
+    restart: unless-stopped
+
+networks:
+  netdevops:
+    driver: bridge
